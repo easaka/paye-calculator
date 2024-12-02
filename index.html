@@ -1,24 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Income Tax Calculator (GRA PAYE - 2024)</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PAYE Tax Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      padding: 20px;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    h2 {
+      text-align: center;
+      color: #4caf50;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background: #4caf50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      background: #e7f9e7;
+      border-left: 4px solid #4caf50;
+    }
+    .result p {
+      margin: 5px 0;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Income Tax Calculator</h1>
-        <form id="tax-form">
-            <label for="gross-income">Enter Your Monthly Gross Income (GHS):</label>
-            <input type="number" id="gross-income" placeholder="e.g., 5000" required>
-            <button type="submit">Calculate Tax</button>
-        </form>
-        <div id="result">
-            <h2>Tax Breakdown</h2>
-            <p id="payable-tax">Payable Tax: GHS 0.00</p>git init
-        </div>
+  <div class="container">
+    <h2>PAYE Tax Calculator</h2>
+    <form id="tax-form">
+      <div class="form-group">
+        <label for="gross-income">Enter Monthly Gross Income (GHS):</label>
+        <input type="number" id="gross-income" placeholder="e.g., 1000" required />
+      </div>
+      <button type="submit">Calculate Tax</button>
+    </form>
+    <div class="result" id="result" style="display: none;">
+      <p id="monthly-tax"></p>
+      <p id="yearly-tax"></p>
     </div>
-    <script src="script.js"></script>
+  </div>
+
+  <script>
+    document.getElementById("tax-form").addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      let grossIncome = parseFloat(document.getElementById("gross-income").value);
+      if (isNaN(grossIncome) || grossIncome <= 0) {
+        alert("Please enter a valid income.");
+        return;
+      }
+
+      const taxBreakdown = calculatePAYE(grossIncome);
+      const yearlyTax = taxBreakdown.tax * 12;
+
+      // Display results
+      const resultDiv = document.getElementById("result");
+      document.getElementById("monthly-tax").textContent = `Monthly Payable Tax: GHS ${taxBreakdown.tax.toFixed(2)}`;
+      document.getElementById("yearly-tax").textContent = `Yearly Payable Tax: GHS ${yearlyTax.toFixed(2)}`;
+      resultDiv.style.display = "block";
+    });
+
+    function calculatePAYE(income) {
+      let tax = 0;
+
+      // Tax Bands
+      const taxBands = [
+        { limit: 490, rate: 0 },        // First GHS 490 - 0%
+        { limit: 110, rate: 0.05 },    // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },    // Next GHS 130 - 10%
+        { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
+        { limit: 16000, rate: 0.25 },  // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },  // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 } // Exceeding GHS 50,416.67 - 35%
+      ];
+
+      for (let band of taxBands) {
+        if (income > band.limit) {
+          tax += band.limit * band.rate; // Tax the full band limit
+          income -= band.limit; // Subtract the taxed portion
+        } else {
+          tax += income * band.rate; // Tax the remaining income
+          break;
+        }
+      }
+
+      return { tax };
+    }
+  </script>
 </body>
 </html>
