@@ -36,6 +36,13 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
+    select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 15px;
+    }
     button {
       width: 100%;
       padding: 10px;
@@ -66,8 +73,15 @@
     <h2>PAYE Tax Calculator</h2>
     <form id="tax-form">
       <div class="form-group">
+        <label for="tax-type">Select Tax Type:</label>
+        <select id="tax-type">
+          <option value="standard">2024 PAYE</option>
+          <option value="graduate">2023 PAYE</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label for="gross-income">Enter Monthly Gross Income (GHS):</label>
-        <input type="number" id="gross-income" placeholder="e.g., 1000" required />
+        <input type="number" id="gross-income" placeholder="e.g., 1000.50" step="0.01" required />
       </div>
       <button type="submit">Calculate Tax</button>
     </form>
@@ -87,7 +101,8 @@
         return;
       }
 
-      const taxBreakdown = calculatePAYE(grossIncome);
+      const taxType = document.getElementById("tax-type").value;
+      const taxBreakdown = taxType === "graduate" ? calculateGraduatePAYE(grossIncome) : calculatePAYE(grossIncome);
       const yearlyTax = taxBreakdown.tax * 12;
 
       // Display results
@@ -100,9 +115,36 @@
     function calculatePAYE(income) {
       let tax = 0;
 
-      // Tax Bands
+      // Standard PAYE Tax Bands (2023)
       const taxBands = [
         { limit: 490, rate: 0 },        // First GHS 490 - 0%
+        { limit: 110, rate: 0.05 },    // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },    // Next GHS 130 - 10%
+        { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
+        { limit: 16000, rate: 0.25 },  // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },  // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 } // Exceeding GHS 50,416.67 - 35%
+      ];
+
+      for (let band of taxBands) {
+        if (income > band.limit) {
+          tax += band.limit * band.rate; // Tax the full band limit
+          income -= band.limit; // Subtract the taxed portion
+        } else {
+          tax += income * band.rate; // Tax the remaining income
+          break;
+        }
+      }
+
+      return { tax };
+    }
+
+    function calculateGraduatePAYE(income) {
+      let tax = 0;
+
+      // Graduate PAYE Tax Bands (2023)
+      const taxBands = [
+        { limit: 402, rate: 0 },        // First GHS 402 - 0%
         { limit: 110, rate: 0.05 },    // Next GHS 110 - 5%
         { limit: 130, rate: 0.10 },    // Next GHS 130 - 10%
         { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
