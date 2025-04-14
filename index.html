@@ -36,12 +36,20 @@
       border: 1px solid #ccc;
       border-radius: 4px;
     }
-    select {
+    select, .radio-group {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
       margin-bottom: 15px;
+    }
+    .radio-options {
+      display: flex;
+      gap: 15px;
+    }
+    .radio-option {
+      display: flex;
+      align-items: center;
     }
     button {
       width: 100%;
@@ -73,65 +81,143 @@
     <h2>PAYE Tax Calculator</h2>
     <form id="tax-form">
       <div class="form-group">
+        <label for="calculation-type">Calculation Type:</label>
+        <div class="radio-group">
+          <div class="radio-options">
+            <div class="radio-option">
+              <input type="radio" id="gross-to-tax" name="calculation-type" value="gross-to-tax" checked>
+              <label for="gross-to-tax">Gross Income to Tax</label>
+            </div>
+            <div class="radio-option">
+              <input type="radio" id="tax-to-gross" name="calculation-type" value="tax-to-gross">
+              <label for="tax-to-gross">Tax Paid to Gross Income</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label for="tax-type">Select Tax Type:</label>
         <select id="tax-type">
-          <option value="standard">2024 PAYE</option>
-          <option value="graduate">2023 PAYE</option>
+          <option value="standard">Standard PAYE</option>
+          <option value="graduate">2023 Graduate PAYE</option>
         </select>
       </div>
-      <div class="form-group">
+
+      <div class="form-group" id="gross-input-group">
         <label for="gross-income">Enter Monthly Gross Income (GHS):</label>
         <input type="number" id="gross-income" placeholder="e.g., 1000.50" step="0.01" required />
       </div>
-      <button type="submit">Calculate Tax</button>
+
+      <div class="form-group" id="tax-input-group" style="display: none;">
+        <label for="tax-paid">Enter Monthly Tax Paid (GHS):</label>
+        <input type="number" id="tax-paid" placeholder="e.g., 150.75" step="0.01" />
+      </div>
+
+      <button type="submit">Calculate</button>
     </form>
+
     <div class="result" id="result" style="display: none;">
-      <p id="monthly-tax"></p>
-      <p id="yearly-tax"></p>
+      <p id="result-line1"></p>
+      <p id="result-line2"></p>
+      <p id="result-line3"></p>
     </div>
   </div>
 
   <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const calculationType = document.getElementsByName('calculation-type');
+      const grossInputGroup = document.getElementById('gross-input-group');
+      const taxInputGroup = document.getElementById('tax-input-group');
+
+      // Toggle between gross-to-tax and tax-to-gross inputs
+      calculationType.forEach(radio => {
+        radio.addEventListener('change', function() {
+          if (this.value === 'gross-to-tax') {
+            grossInputGroup.style.display = 'block';
+            taxInputGroup.style.display = 'none';
+            document.getElementById('gross-income').required = true;
+            document.getElementById('tax-paid').required = false;
+          } else {
+            grossInputGroup.style.display = 'none';
+            taxInputGroup.style.display = 'block';
+            document.getElementById('gross-income').required = false;
+            document.getElementById('tax-paid').required = true;
+          }
+        });
+      });
+    });
+
     document.getElementById("tax-form").addEventListener("submit", function (event) {
       event.preventDefault();
 
+      const calculationType = document.querySelector('input[name="calculation-type"]:checked').value;
+      const taxType = document.getElementById("tax-type").value;
+
+      if (calculationType === 'gross-to-tax') {
+        calculateTaxFromGross(taxType);
+      } else {
+        calculateGrossFromTax(taxType);
+      }
+    });
+
+    function calculateTaxFromGross(taxType) {
       let grossIncome = parseFloat(document.getElementById("gross-income").value);
       if (isNaN(grossIncome) || grossIncome <= 0) {
         alert("Please enter a valid income.");
         return;
       }
 
-      const taxType = document.getElementById("tax-type").value;
       const taxBreakdown = taxType === "graduate" ? calculateGraduatePAYE(grossIncome) : calculatePAYE(grossIncome);
       const yearlyTax = taxBreakdown.tax * 12;
+      const netIncome = grossIncome - taxBreakdown.tax;
 
       // Display results
       const resultDiv = document.getElementById("result");
-      document.getElementById("monthly-tax").textContent = `Monthly Payable Tax: GHS ${taxBreakdown.tax.toFixed(2)}`;
-      document.getElementById("yearly-tax").textContent = `Yearly Payable Tax: GHS ${yearlyTax.toFixed(2)}`;
+      document.getElementById("result-line1").textContent = `Monthly Payable Tax: GHS ${taxBreakdown.tax.toFixed(2)}`;
+      document.getElementById("result-line2").textContent = `Yearly Payable Tax: GHS ${yearlyTax.toFixed(2)}`;
+      // document.getElementById("result-line3").textContent = `Monthly Net Income: GHS ${netIncome.toFixed(2)}`;
       resultDiv.style.display = "block";
-    });
+    }
 
+    function calculateGrossFromTax(taxType) {
+      let taxPaid = parseFloat(document.getElementById("tax-paid").value);
+      if (isNaN(taxPaid) || taxPaid < 0) {
+        alert("Please enter a valid tax amount.");
+        return;
+      }
+
+      const result = taxType === "graduate" ? reverseCalculateGraduatePAYE(taxPaid) : reverseCalculatePAYE(taxPaid);
+
+      // Display results
+      const resultDiv = document.getElementById("result");
+      document.getElementById("result-line1").textContent = `Estimated Gross Income: GHS ${result.grossIncome.toFixed(2)}`;
+      document.getElementById("result-line2").textContent = `Monthly Tax Paid: GHS ${taxPaid.toFixed(2)}`;
+      // document.getElementById("result-line3").textContent = `Monthly Net Income: GHS ${(result.grossIncome - taxPaid).toFixed(2)}`;
+      resultDiv.style.display = "block";
+    }
+
+    // Standard PAYE calculation (gross to tax)
     function calculatePAYE(income) {
       let tax = 0;
+      let remainingIncome = income;
 
-      // Standard PAYE Tax Bands (2023)
       const taxBands = [
         { limit: 490, rate: 0 },        // First GHS 490 - 0%
-        { limit: 110, rate: 0.05 },    // Next GHS 110 - 5%
-        { limit: 130, rate: 0.10 },    // Next GHS 130 - 10%
+        { limit: 110, rate: 0.05 },     // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },     // Next GHS 130 - 10%
         { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
-        { limit: 16000, rate: 0.25 },  // Next GHS 16,000 - 25%
-        { limit: 30520, rate: 0.30 },  // Next GHS 30,520 - 30%
-        { limit: Infinity, rate: 0.35 } // Exceeding GHS 50,416.67 - 35%
+        { limit: 16000, rate: 0.25 },   // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },   // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 }  // Exceeding GHS 50,416.67 - 35%
       ];
 
       for (let band of taxBands) {
-        if (income > band.limit) {
-          tax += band.limit * band.rate; // Tax the full band limit
-          income -= band.limit; // Subtract the taxed portion
+        if (remainingIncome > 0) {
+          const taxableAmount = Math.min(remainingIncome, band.limit);
+          tax += taxableAmount * band.rate;
+          remainingIncome -= taxableAmount;
         } else {
-          tax += income * band.rate; // Tax the remaining income
           break;
         }
       }
@@ -139,31 +225,112 @@
       return { tax };
     }
 
+    // Graduate PAYE calculation (gross to tax)
     function calculateGraduatePAYE(income) {
       let tax = 0;
+      let remainingIncome = income;
 
-      // Graduate PAYE Tax Bands (2023)
       const taxBands = [
         { limit: 402, rate: 0 },        // First GHS 402 - 0%
-        { limit: 110, rate: 0.05 },    // Next GHS 110 - 5%
-        { limit: 130, rate: 0.10 },    // Next GHS 130 - 10%
+        { limit: 110, rate: 0.05 },     // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },     // Next GHS 130 - 10%
         { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
-        { limit: 16000, rate: 0.25 },  // Next GHS 16,000 - 25%
-        { limit: 30520, rate: 0.30 },  // Next GHS 30,520 - 30%
-        { limit: Infinity, rate: 0.35 } // Exceeding GHS 50,416.67 - 35%
+        { limit: 16000, rate: 0.25 },   // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },   // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 }  // Exceeding GHS 50,416.67 - 35%
       ];
 
       for (let band of taxBands) {
-        if (income > band.limit) {
-          tax += band.limit * band.rate; // Tax the full band limit
-          income -= band.limit; // Subtract the taxed portion
+        if (remainingIncome > 0) {
+          const taxableAmount = Math.min(remainingIncome, band.limit);
+          tax += taxableAmount * band.rate;
+          remainingIncome -= taxableAmount;
         } else {
-          tax += income * band.rate; // Tax the remaining income
           break;
         }
       }
 
       return { tax };
+    }
+
+    // Reverse calculation for Standard PAYE (tax to gross)
+    function reverseCalculatePAYE(taxPaid) {
+      let grossIncome = 0;
+      let remainingTax = taxPaid;
+
+      const taxBands = [
+        { limit: 490, rate: 0 },        // First GHS 490 - 0%
+        { limit: 110, rate: 0.05 },     // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },     // Next GHS 130 - 10%
+        { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
+        { limit: 16000, rate: 0.25 },   // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },   // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 }  // Exceeding GHS 50,416.67 - 35%
+      ];
+
+      for (let band of taxBands) {
+        if (remainingTax <= 0) break;
+
+        if (band.rate > 0) {
+          const maxTaxInBand = band.limit * band.rate;
+          if (remainingTax > maxTaxInBand) {
+            grossIncome += band.limit;
+            remainingTax -= maxTaxInBand;
+          } else {
+            grossIncome += remainingTax / band.rate;
+            remainingTax = 0;
+          }
+        } else {
+          grossIncome += band.limit;
+        }
+      }
+
+      // If there's still tax remaining, it's in the highest bracket
+      if (remainingTax > 0) {
+        grossIncome += remainingTax / taxBands[taxBands.length - 1].rate;
+      }
+
+      return { grossIncome };
+    }
+
+    // Reverse calculation for Graduate PAYE (tax to gross)
+    function reverseCalculateGraduatePAYE(taxPaid) {
+      let grossIncome = 0;
+      let remainingTax = taxPaid;
+
+      const taxBands = [
+        { limit: 402, rate: 0 },        // First GHS 402 - 0%
+        { limit: 110, rate: 0.05 },     // Next GHS 110 - 5%
+        { limit: 130, rate: 0.10 },     // Next GHS 130 - 10%
+        { limit: 3166.67, rate: 0.175 }, // Next GHS 3166.67 - 17.5%
+        { limit: 16000, rate: 0.25 },   // Next GHS 16,000 - 25%
+        { limit: 30520, rate: 0.30 },   // Next GHS 30,520 - 30%
+        { limit: Infinity, rate: 0.35 }  // Exceeding GHS 50,416.67 - 35%
+      ];
+
+      for (let band of taxBands) {
+        if (remainingTax <= 0) break;
+
+        if (band.rate > 0) {
+          const maxTaxInBand = band.limit * band.rate;
+          if (remainingTax > maxTaxInBand) {
+            grossIncome += band.limit;
+            remainingTax -= maxTaxInBand;
+          } else {
+            grossIncome += remainingTax / band.rate;
+            remainingTax = 0;
+          }
+        } else {
+          grossIncome += band.limit;
+        }
+      }
+
+      // If there's still tax remaining, it's in the highest bracket
+      if (remainingTax > 0) {
+        grossIncome += remainingTax / taxBands[taxBands.length - 1].rate;
+      }
+
+      return { grossIncome };
     }
   </script>
 </body>
